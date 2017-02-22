@@ -1,0 +1,81 @@
+clear all; clc;
+% demo;
+% cg(isnan(cg))=0; %remove NaN entries
+% cg =cg(:,:,6:end-5); %used for the sphere
+
+%% Create random data with mean filtering
+k=7; filter = ones(k,k,k)./k^3; clear k;
+cg = convn(256.*rand(214,214,160),filter,'valid');
+[m,n,o] = size(cg);
+
+%% Data speed change
+if 1,
+    aux = [];
+    for i =1:o,
+       ind =  round(( 1/(o+1) )* i.^2 + (o/(o+1)));
+       if ind > o, break; end 
+       aux(:,:,i) = cg(:,:, ind);
+    end
+    cg = aux; clear aux;
+    [m,n,o] = size(cg);
+end
+           
+        
+
+%% Data slicing
+
+vr_v = reshape(cg,m*n,o);  % Vertical vectorization
+for k = 1:o,                % Horizontal vectorization
+    aux = cg(:,:,k)';
+    vr_h(:,k) = aux(:);
+end
+
+%%
+DOinterp = logical(true);        
+xi = 1:(1/4):m*n; %interp1 basis
+d=1;   % interval between frames to be compared
+
+for i = 1:o-d
+    %% vertical Xcorr lags
+    if DOinterp
+        [r,lags] = xcorr( interp1(vr_v(:,i), xi),  interp1(vr_v(:,i+d), xi),'coeff');
+    else
+        [r,lags] = xcorr( vr_v(:,i),  vr_v(:,i+d) );
+    end
+        
+    [xcorr_max, ind] = max(r);
+    lags_v(i) = lags(ind);          %slide to make maximum cross correlation with vertical vectorization
+    xcorr_max_v(i) = xcorr_max;     %maximum normalized cross correlation
+    norm_v(i) = norm(vr_v(:,i)-vr_v(:,i+d));
+    
+    %% Horizontal Xcorr lags
+    if DOinterp
+        [r,lags] = xcorr( interp1(vr_h(:,i), xi),  interp1(vr_h(:,i+1), xi),'coeff');
+    else
+        [r,lags] = xcorr( vr_h(:,i),  vr_h(:,i+d) );
+    end
+    [xcorr_max, ind] = max(r);
+    lags_h(i) = lags(ind);
+    xcorr_max_h(i) = xcorr_max;     %maximum normalized cross correlation
+    norm_h(i) = norm(vr_h(:,i)-vr_h(:,i+d));
+    
+    disp(['Frame nº: ', num2str(i), ' of ',num2str(size(vr_v,2))]);
+
+end
+
+figure('name','Velocity estimation'),
+subplot(4,3,1); imshow(cg(:,:,15),[]), title(['Frame: ',num2str(15), ' -  [ ',num2str(n),' X ',num2str(m),' ]']);
+subplot(4,3,2); imshow(vr_h,[]); title('Visual Rhythm - Horizontal'); drawnow; xlabel('time'); axis square
+subplot(4,3,3); imshow(vr_v,[]); title('Visual Rhythm - Vertical'); drawnow; xlabel('time'); axis square
+
+subplot(4,3,4); plot(sqrt(lags_v.^2+lags_h.^2)); title('Energia de deslocação');
+subplot(4,3,5); plot(lags_h); title('xcorr horizontal lag'); xlabel('time');
+subplot(4,3,6); plot(lags_v); title('xcorr vertical lag'); xlabel('time');
+
+subplot(4,3,7); plot(sqrt(xcorr_max_v.^2+xcorr_max_h.^2)); title('Energia de xcorr maxima');
+subplot(4,3,8); plot(xcorr_max_v); title('xcorr horizontal max'); xlabel('time');
+subplot(4,3,9); plot(xcorr_max_h); title('xcorr vertical max'); xlabel('time');
+
+subplot(4,3,10); plot(sqrt(norm_v.^2+norm_h.^2)); title('Energia de xcorr maxima');
+subplot(4,3,11); plot(norm_h); title('Norm horizontal'); xlabel('time');
+subplot(4,3,12); plot(norm_v); title('Norm vertical'); xlabel('time');
